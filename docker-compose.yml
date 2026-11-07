@@ -1,0 +1,8 @@
+services:
+  word-party:
+    build: .
+    container_name: word-party
+    ports:
+      # Host port 8085 (8080 is used by the Stock app behind Caddy). Caddy reaches it at host.docker.internal:8085.
+      - "8085:8080"
+    restart: unless-stopped

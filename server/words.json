@@ -1,0 +1,68 @@
+{
+  "Animals": {
+    "prefix": "animal",
+    "easy": ["Cat", "Elephant", "Penguin", "Dog", "Giraffe", "Monkey", "Lion", "Frog", "Rabbit", "Duck"],
+    "medium": ["Octopus", "Kangaroo", "Dolphin", "Flamingo", "Hedgehog", "Crocodile", "Peacock", "Jellyfish", "Sloth", "Owl"],
+    "hard": ["Chameleon", "Platypus", "Armadillo", "Narwhal", "Pangolin", "Mongoose", "Albatross", "Axolotl", "Manatee", "Wolverine"]
+  },
+  "Food & Drink": {
+    "prefix": "food",
+    "easy": ["Pizza", "Popcorn", "Banana", "Ice cream", "Hamburger", "Pancakes", "Sandwich", "Chocolate", "Apple", "Cheese"],
+    "medium": ["Pineapple", "Croissant", "Sushi", "Pretzel", "Avocado", "Lasagna", "Milkshake", "Dumpling", "Burrito", "Watermelon"],
+    "hard": ["Artichoke", "Saffron", "Fondue", "Tiramisu", "Kimchi", "Quinoa", "Baklava", "Ratatouille", "Wasabi", "Pomegranate"]
+  },
+  "Everyday Objects": {
+    "prefix": "object",
+    "easy": ["Umbrella", "Toothbrush", "Scissors", "Clock", "Key", "Spoon", "Pillow", "Mirror", "Backpack", "Ladder"],
+    "medium": ["Telescope", "Compass", "Hourglass", "Flashlight", "Stapler", "Vacuum cleaner", "Hammock", "Zipper", "Thermometer", "Calculator"],
+    "hard": ["Kaleidoscope", "Metronome", "Abacus", "Sundial", "Corkscrew", "Periscope", "Typewriter", "Stethoscope", "Colander", "Barometer"]
+  },
+  "Places": {
+    "prefix": "place",
+    "easy": ["Airport", "Library", "Beach", "School", "Hospital", "Zoo", "Supermarket", "Bakery", "Playground", "Cinema"],
+    "medium": ["Lighthouse", "Greenhouse", "Aquarium", "Castle", "Stadium", "Museum", "Pyramid", "Farm", "Subway station", "Carnival"],
+    "hard": ["Observatory", "Monastery", "Cathedral", "Vineyard", "Embassy", "Planetarium", "Catacombs", "Courthouse", "Mausoleum", "Bazaar"]
+  },
+  "Actions": {
+    "prefix": "action",
+    "easy": ["Dancing", "Sneezing", "Running", "Sleeping", "Swimming", "Laughing", "Clapping", "Jumping", "Eating", "Singing"],
+    "medium": ["Juggling", "Whistling", "Knitting", "Fishing", "Skateboarding", "Hiccuping", "Yawning", "Painting", "Cooking", "Surfing"],
+    "hard": ["Meditating", "Ice skating", "Eavesdropping", "Procrastinating", "Sleepwalking", "Hitchhiking", "Tiptoeing", "Daydreaming", "Apologizing", "Bargaining"]
+  },
+  "Nature": {
+    "prefix": "nature",
+    "easy": ["Rainbow", "Waterfall", "Mountain", "River", "Sun", "Moon", "Snowflake", "Forest", "Lightning", "Ocean"],
+    "medium": ["Volcano", "Glacier", "Desert", "Tornado", "Cave", "Island", "Earthquake", "Coral reef", "Swamp", "Sunrise"],
+    "hard": ["Aurora", "Stalactite", "Tundra", "Geyser", "Canyon", "Eclipse", "Quicksand", "Avalanche", "Estuary", "Archipelago"]
+  },
+  "People & Jobs": {
+    "prefix": "profession",
+    "easy": ["Chef", "Firefighter", "Teacher", "Doctor", "Pilot", "Police officer", "Farmer", "Clown", "Dentist", "Singer"],
+    "medium": ["Architect", "Astronaut", "Plumber", "Detective", "Magician", "Photographer", "Mechanic", "Lifeguard", "Librarian", "Referee"],
+    "hard": ["Cartographer", "Archaeologist", "Auctioneer", "Choreographer", "Sommelier", "Interpreter", "Blacksmith", "Taxidermist", "Meteorologist", "Locksmith"]
+  },
+  "Sports & Hobbies": {
+    "prefix": "sport",
+    "easy": ["Football", "Basketball", "Tennis", "Golf", "Bowling", "Boxing", "Cycling", "Baseball", "Volleyball", "Yoga"],
+    "medium": ["Archery", "Gymnastics", "Karate", "Rowing", "Badminton", "Snowboarding", "Rock climbing", "Chess", "Camping", "Pottery"],
+    "hard": ["Fencing", "Curling", "Javelin", "Biathlon", "Origami", "Calligraphy", "Bird watching", "Orienteering", "Triathlon", "Beekeeping"]
+  },
+  "Travel & Transport": {
+    "prefix": "travel",
+    "easy": ["Bicycle", "Airplane", "Train", "Bus", "Taxi", "Helicopter", "Boat", "Motorcycle", "Suitcase", "Passport"],
+    "medium": ["Submarine", "Hot air balloon", "Cable car", "Ferry", "Scooter", "Tram", "Rickshaw", "Parachute", "Canoe", "Tractor"],
+    "hard": ["Gondola", "Zeppelin", "Catamaran", "Monorail", "Funicular", "Hovercraft", "Itinerary", "Layover", "Turbulence", "Stowaway"]
+  },
+  "Science & Tech": {
+    "prefix": "science",
+    "easy": ["Computer", "Robot", "Magnet", "Battery", "Rocket", "Camera", "Telephone", "Light bulb", "Microscope", "Planet"],
+    "medium": ["Satellite", "Laser", "Skeleton", "Gravity", "Solar panel", "Fossil", "Hologram", "Drone", "Magnifying glass", "Test tube"],
+    "hard": ["Algorithm", "Photosynthesis", "Black hole", "Molecule", "Hypothesis", "Semiconductor", "Pendulum", "Ecosystem", "Evaporation", "Constellation"]
+  },
+  "Music & Arts": {
+    "prefix": "arts",
+    "easy": ["Guitar", "Piano", "Drum", "Paintbrush", "Microphone", "Trumpet", "Violin", "Concert", "Headphones", "Choir"],
+    "medium": ["Orchestra", "Saxophone", "Harp", "Sculpture", "Opera", "Ballet", "Karaoke", "Graffiti", "Accordion", "Puppet"],
+    "hard": ["Symphony", "Bagpipes", "Mosaic", "Silhouette", "Encore", "Falsetto", "Harpsichord", "Cabaret", "Tapestry", "Cello"]
+  }
+}
