@@ -10,7 +10,7 @@ const DIFFICULTIES = [
 const TURN_OPTIONS = [2, 3, 5, 7, 10, 15];   // minutes per turn, chosen on the setup screen
 const DEFAULT_MINUTES = 7;
 const STORAGE_KEY = 'word-party:v1';
-const MAX_PLAYERS = 8;
+const MAX_PLAYERS = 12;
 const MODES = [
   { id: 'explain', name: 'Explain', icon: '💬', detail: 'Describe it without saying the word.' },
   { id: 'act', name: 'Act it out', icon: '🎭', detail: 'Use gestures. No speaking.' },

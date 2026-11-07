@@ -10,7 +10,7 @@ Build and maintain a friendly, local, pass-and-play party game where players hel
 - No database or external service is required.
 
 ## Core rules
-- Minimum two players.
+- Minimum two players, maximum 12 (`MAX_PLAYERS` in `src/main.jsx`; the setup screen, "Who's up?" grid, results and copied results all adapt to the count, so raise it there only).
 - Turn length is chosen on the setup screen, before the game starts: 2, 3, 5, 7, 10 or 15 minutes (default 7). It applies to every player and cannot change mid-game.
 - Each player receives one turn of that length. Players choose their own name from those who haven't played yet; turn order is not fixed.
 - The active clue-giver sees the current word; the rest of the group guesses.

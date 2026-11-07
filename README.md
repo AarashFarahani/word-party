@@ -11,7 +11,7 @@ Open http://localhost:8085 (or http://localhost:8800/word-party/ if you run the 
 Stop with `docker compose down`.
 
 ## How to play
-- Add at least two players (each with a different name).
+- Add at least two players, up to 12 (each with a different name).
 - Choose how long each turn lasts: 2, 3, 5, 7, 10 or 15 minutes (default 7). This is set once, before the game, and is the same for everyone.
 - When it's your turn, tap **your name** on the "Who's up?" screen, then choose a category (or All categories), a difficulty, and a clue style. Players can go in any order.
 - Each player gets one timed turn. The active player sees the secret word and helps everyone else guess it.
