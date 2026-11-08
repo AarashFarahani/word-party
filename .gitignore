@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output (created by `npm run build` and the Docker image build)
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files (may contain secrets); keep an example file if you add one
+.env
+.env.*
+!.env.example
+
+# Vite / tooling caches and local overrides
+.vite/
+*.local
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# SQLite database (saved groups and game history)
+data/

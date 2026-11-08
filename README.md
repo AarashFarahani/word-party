@@ -19,12 +19,15 @@ Stop with `docker compose down`.
 - You can change the difficulty before every next word, and **Change category** lets you switch category at any time. The timer keeps running while you do.
 - The game ends after every player has taken a turn. The results screen shows the winner (ties are shown), each player's guessed/skipped/points, and lets you play again with the same players or copy the results.
 - As soon as a player finishes, tap **Review words** to see which words they guessed or skipped. Every finished player keeps a **Review words** button on the "Who's up?" screen, so you can go back to anyone's words before the next turn starts, and the results screen has a **Review** button for every player too. Switch any word between **Guessed** and **Skipped** to fix a mistake; points and the winner update immediately. A word still showing when time ran out is counted as skipped, and you can change it here.
-- Clue styles: Explain (describe without saying the word), Act (gesture), and Sound (make noises).
+- Clue styles: Explain (describe without saying the word), Act (gesture), and Sound (make noises). With **Make sounds** you only get words that have a recognisable sound (animals, vehicles, instruments, noisy actions…), and the category list shows how many sound words each category has.
 
-The app runs entirely locally. Scores and the current game are held in the browser session; refreshing the page resets the game. The browser does remember your chosen turn length and which words have been played, so words don't come back in later games until a category/difficulty pool is used up. Use **Forget played words** on the setup screen to start fresh.
+- Give your group a name and it is saved. Next time, tap it under **Saved groups** to play again with the same players. If the tab is closed mid-game, tap **Resume game** on that group to carry on from the last finished turn.
+- The results screen also shows the group's **all-time leaderboard** (wins, total points and best game across every game the group has played).
+
+The app runs entirely locally. Saved groups, games and leaderboards are stored in a SQLite database in `./data/word-party.db` (mounted into the container, so it survives rebuilds). A turn that is in progress when the page is refreshed is not saved and is simply replayed. The browser does remember your chosen turn length and which words have been played, so words don't come back in later games until a category/difficulty pool is used up. Use **Forget played words** on the setup screen to start fresh.
 
 ## Words
-The word list (330 words across 11 categories) is in `server/words.json`, grouped by category and difficulty. To add words, append them to the right `easy` / `medium` / `hard` array and rebuild. The server refuses to start if the same word appears twice in a category, so mistakes are caught immediately.
+The word list (5,823 words across 16 categories: 2,461 easy, 1,702 medium, 1,660 hard, including a Movies & Actors category) is in `server/words.json`, grouped by category and difficulty. Each category also has a `sound` list naming the words that work for **Make sounds**. To add words, append them to the right `easy` / `medium` / `hard` array (and to `sound` if you can clue it with a noise) and rebuild. The server refuses to start if a word appears twice anywhere, or if a `sound` word isn't in its category, so mistakes are caught immediately.
 
 ## Playing on a tablet
 - Open `http://<your-computer-ip>:8800/word-party/` (through Caddy) or `http://<your-computer-ip>:8085` on the tablet while both are on the same Wi-Fi.
@@ -39,4 +42,4 @@ After changing the Caddyfile or dashboard, reload with `docker compose restart c
 
 ## Services
 - `word-party`: Node/Express API plus built React app. Listens on 8080 inside the container, published on host port 8085.
-- `docker-compose.yml`: one-container deployment for a lightweight local game.
+- `docker-compose.yml`: one-container deployment for a lightweight local game. `./data` holds the SQLite database; back it up by copying that folder while the container is stopped.

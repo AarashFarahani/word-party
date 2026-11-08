@@ -14,7 +14,7 @@ const MAX_PLAYERS = 12;
 const MODES = [
   { id: 'explain', name: 'Explain', icon: '💬', detail: 'Describe it without saying the word.' },
   { id: 'act', name: 'Act it out', icon: '🎭', detail: 'Use gestures. No speaking.' },
-  { id: 'sound', name: 'Make sounds', icon: '🔊', detail: 'Make noises that help the group guess.' }
+  { id: 'sound', name: 'Make sounds', icon: '🔊', detail: 'Make noises, no words. You only get words that have a sound, like animals and vehicles.' }
 ];
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -29,6 +29,32 @@ const formatTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')
 const loadStore = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } };
 const saveStore = patch => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadStore(), ...patch })); } catch { /* storage unavailable */ } };
 const loadSeen = () => { const s = loadStore().seen; return Array.isArray(s) ? s.filter(u => u && typeof u.id === 'string') : []; };
+
+// Saved groups, games and the all-time leaderboard live in the server's SQLite database.
+// Paths are relative on purpose (no leading slash) so the app works behind the Caddy prefix.
+async function api(path, { method = 'GET', body } = {}) {
+  const res = await fetch(`api/${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function AllTimeBoard({ board, groupName }) {
+  if (!board || !board.games) return null;
+  const top = board.players[0];
+  return <div className="alltime">
+    <div className="section-heading"><h2>All-time leaderboard{groupName ? ` · ${groupName}` : ''}</h2><span>{board.games} game{board.games > 1 ? 's' : ''}</span></div>
+    <div className="alltime-table" role="table" aria-label="All-time leaderboard">
+      <div className="alltime-row head" role="row"><span>#</span><span>Player</span><span>Wins</span><span>Points</span><span>Best</span></div>
+      {board.players.map(p => <div className={`alltime-row ${top && p.rank === 1 && p.wins > 0 ? 'first' : ''}`} role="row" key={p.name}>
+        <span>{p.rank <= 3 && p.wins + p.points > 0 ? MEDALS[p.rank - 1] : p.rank}</span>
+        <span className="alltime-name"><b>{p.name}</b><small>{p.games} game{p.games > 1 ? 's' : ''} · {p.guessed} guessed</small></span>
+        <span>{p.wins}</span><span>{p.points}</span><span>{p.best}</span>
+      </div>)}
+    </div>
+  </div>;
+}
 
 function DifficultyPicker({ value, onChange, compact }) {
   return <div className={`difficulty-grid ${compact ? 'compact' : ''}`} role="group" aria-label="Difficulty">
@@ -75,17 +101,57 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [groups, setGroups] = useState([]);           // saved groups from the server
+  const [groupId, setGroupId] = useState(null);       // the saved group this game belongs to
+  const [groupName, setGroupName] = useState('');
+  const [gameId, setGameId] = useState(null);         // server record of the current game (progress is saved after each turn)
+  const [board, setBoard] = useState(null);           // all-time leaderboard of the current group
+  const [saveError, setSaveError] = useState('');
   const usedRef = useRef(null);     // words already shown on this device, kept across games: { id, category, difficulty }
   if (usedRef.current === null) usedRef.current = loadSeen();
   const [seenCount, setSeenCount] = useState(() => usedRef.current.length);
   const deadlineRef = useRef(0);    // timestamp the current turn ends at
   const turnToken = useRef(0);      // invalidates in-flight word requests when a turn ends
+  const gameWords = useRef(new Set()); // ids shown in the current game: never repeated, even when a pool is reshuffled
+  const pendingSave = useRef(null); // game progress waiting to be sent to the server { gameId, body }
 
   // API URLs are relative on purpose (no leading slash): the app is served at / directly and at /word-party/ behind Caddy.
   useEffect(() => { fetch('api/categories').then(r => r.json()).then(setCategories).catch(() => {}); }, []);
+  useEffect(() => { if (phase === 'setup') refreshGroups(); }, [phase]);
+
+  // Save progress whenever a turn finishes or a review changes a result, so closing the tab loses nothing.
+  // Nothing is sent mid-turn; an interrupted turn is simply replayed after resuming.
+  useEffect(() => {
+    if (!gameId || !(phase === 'ready' || phase === 'results')) return;
+    const status = phase === 'results' ? 'finished' : 'playing';
+    const body = { logs, played, status };
+    pendingSave.current = { gameId, body };
+    const t = setTimeout(() => {
+      pendingSave.current = null;
+      api(`games/${gameId}`, { method: 'PUT', body })
+        .then(() => { setSaveError(''); if (status === 'finished' && groupId) return api(`groups/${groupId}/leaderboard`).then(setBoard); })
+        .catch(() => setSaveError('Could not save to the server. The game still works, but this result may not be kept.'));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [gameId, groupId, logs, played, phase]);
+
+  // Send a save that is still waiting (debounced) right away: when leaving a game, or when the tab is closed.
+  function flushSave() {
+    const p = pendingSave.current;
+    if (!p) return;
+    pendingSave.current = null;
+    fetch(`api/games/${p.gameId}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p.body) }).catch(() => {});
+  }
+  useEffect(() => {
+    window.addEventListener('pagehide', flushSave);
+    return () => window.removeEventListener('pagehide', flushSave);
+  }, []);
 
   const activePlayer = activeIndex === null ? '' : players[activeIndex];
   const categoryLabel = category === 'all' ? 'All categories' : category;
+  // "Make sounds" only uses words you can clue with a noise, so it only offers categories that have some.
+  const soundMode = mode === 'sound';
+  const modeCategories = categories.filter(c => !soundMode || c.soundCount > 0).map(c => ({ ...c, count: soundMode ? c.soundCount : c.count }));
   const selectedMode = MODES.find(m => m.id === mode);
   const current = statsFor(activeIndex);
   const lt = lastTurn ? statsFor(lastTurn.index) : null;
@@ -134,6 +200,11 @@ function App() {
 
   function saveSeen() { saveStore({ seen: usedRef.current }); setSeenCount(usedRef.current.length); }
   function forgetPlayedWords() { usedRef.current = []; saveSeen(); }
+  function chooseMode(m) {
+    setMode(m);
+    // Switching to "Make sounds" from a category with no sound words falls back to All categories.
+    if (m === 'sound' && category !== 'all' && !categories.some(c => c.id === category && c.soundCount > 0)) setCategory('all');
+  }
   function chooseMinutes(m) { setTurnMinutes(m); setSeconds(m * 60); saveStore({ turnMinutes: m }); }
 
   async function drawWord(cat = category, diff = difficulty) {
@@ -141,18 +212,23 @@ function App() {
     setBusy(true); setMessage('');
     try {
       const inPool = u => (cat === 'all' || u.category === cat) && u.difficulty === diff;
-      const request = () => fetch(`api/word?${new URLSearchParams({ category: cat, difficulty: diff, exclude: usedRef.current.filter(inPool).map(u => u.id).join(',') })}`);
+      // POST, because the list of already-played ids can be far too long for a URL.
+      const request = () => fetch('api/word', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: cat, difficulty: diff, mode: soundMode ? 'sound' : '', exclude: usedRef.current.filter(inPool).map(u => u.id) }) });
       let response = await request();
       let data = await response.json();
-      if (response.status === 404) {
-        // This pool is used up: reshuffle only the words from this selection and continue.
-        usedRef.current = usedRef.current.filter(u => !inPool(u));
+      if (response.status === 404 && data.exhausted) {
+        // This pool is used up: forget only the words from this pool and reshuffle it.
+        // Words already shown in this game stay excluded, so a small pool never repeats within one game.
+        const pool = new Set(data.poolIds || []);
+        usedRef.current = usedRef.current.filter(u => !pool.has(u.id) || gameWords.current.has(u.id));
         response = await request();
         data = await response.json();
       }
       if (token !== turnToken.current) return;
       if (!response.ok) throw new Error(data.error || 'Could not get a word');
       usedRef.current.push({ id: data.id, category: data.category, difficulty: data.difficulty });
+      gameWords.current.add(data.id);
       saveSeen();
       setWord(data);
     } catch (e) {
@@ -171,17 +247,62 @@ function App() {
 
   function resetRound() {
     turnToken.current += 1;
+    gameWords.current = new Set();
     setLogs({}); setPlayed([]); setReviewFor(null); setActiveIndex(null); setLastTurn(null); setWord(null);
     setPickingCategory(false); setConfirmEnd(false); setMessage(''); setPop(null); setBusy(false); setSeconds(turnSeconds);
   }
 
-  function startGame() {
+  function refreshGroups() { api('groups').then(setGroups).catch(() => setGroups([])); }
+
+  function loadGroup(g) {
+    setGroupId(g.id); setGroupName(g.name); setPlayers(g.players); setMessage('');
+    if (TURN_OPTIONS.includes(g.turnMinutes)) chooseMinutes(g.turnMinutes);
+  }
+  function newGroup() { setGroupId(null); setGroupName(''); setPlayers(['Player 1', 'Player 2']); setMessage(''); }
+  async function deleteGroup(g) {
+    if (!window.confirm(`Delete the group "${g.name}" and its leaderboard? This cannot be undone.`)) return;
+    try { await api(`groups/${g.id}`, { method: 'DELETE' }); } catch (e) { setMessage(e.message); }
+    if (groupId === g.id) newGroup();
+    refreshGroups();
+  }
+
+  // Creates the server record for a new game of the current group (falls back to an unsaved game if the server is unreachable).
+  async function createGame(gid, list) {
+    setGameId(null); setBoard(null);
+    if (!gid) return;
+    try { const game = await api(`groups/${gid}/games`, { method: 'POST', body: { players: list, turnMinutes } }); setGameId(game.id); setSaveError(''); }
+    catch { setSaveError('Could not save this game to the server. You can still play.'); }
+  }
+
+  async function startGame() {
     const clean = players.map(p => p.trim()).filter(Boolean);
     if (clean.length < 2) { setMessage('Add at least two players with names.'); return; }
     if (new Set(clean.map(p => p.toLowerCase())).size !== clean.length) {
       setMessage('Give each player a different name so everyone can find theirs.'); return;
     }
+    let gid = groupId;
+    try {
+      const body = { name: groupName.trim(), players: clean, turnMinutes };
+      const g = gid ? await api(`groups/${gid}`, { method: 'PUT', body }).catch(e => { if (/not found/i.test(e.message)) return api('groups', { method: 'POST', body }); throw e; })
+        : await api('groups', { method: 'POST', body });
+      gid = g.id; setGroupId(g.id); setGroupName(g.name);
+    } catch { gid = null; setGroupId(null); }
     resetRound(); setPlayers(clean); setPhase('ready');
+    await createGame(gid, clean);
+  }
+
+  async function resumeGame(g) {
+    try {
+      const game = await api(`games/${g.activeGame.id}`);
+      resetRound();
+      setGroupId(g.id); setGroupName(g.name); setPlayers(game.players);
+      if (TURN_OPTIONS.includes(game.turnMinutes)) { setTurnMinutes(game.turnMinutes); setSeconds(game.turnMinutes * 60); }
+      setLogs(game.logs || {}); setPlayed(game.played || []);
+      gameWords.current = new Set(Object.values(game.logs || {}).flat().map(e => e.id)); setGameId(game.id); setSaveError('');
+      const remaining = game.players.map((_, i) => i).filter(i => !(game.played || []).includes(i));
+      setActiveIndex(remaining.length === 1 ? remaining[0] : null);
+      setPhase(remaining.length ? 'ready' : 'results');
+    } catch (e) { setMessage(`Could not resume: ${e.message}`); refreshGroups(); }
   }
 
   async function startTurn() {
@@ -237,9 +358,14 @@ function App() {
     setPhase('ready');
   }
 
-  function playAgain() { resetRound(); setPhase('ready'); }
-  function newGame() { resetRound(); setPhase('setup'); }
-  function quitGame() { if (window.confirm('Quit this game and go back to player setup? Scores will be lost.')) newGame(); }
+  function playAgain() { flushSave(); resetRound(); setPhase('ready'); createGame(groupId, players); }
+  function newGame() { flushSave(); resetRound(); setGameId(null); setBoard(null); setPhase('setup'); }
+  function quitGame() {
+    if (!window.confirm('Quit this game and go back to player setup? Scores for this game will be lost.')) return;
+    pendingSave.current = null;
+    if (gameId) api(`games/${gameId}`, { method: 'DELETE' }).catch(() => {});
+    newGame();
+  }
 
   async function copyResults() {
     const text = ['Word Party results 🏆', ...ranked.map(r =>
@@ -260,6 +386,22 @@ function App() {
     {phase === 'setup' && <section className="panel setup">
       <div className="eyebrow">THE GROUP GAME</div><h1>Let the words<br/><span>bring you together.</span></h1>
       <p className="intro">One secret word. One clue-giver. Everyone else guesses. How many can your group get in {turnMinutes} minutes?</p>
+      {groups.length > 0 && <>
+        <div className="section-heading"><h2>Saved groups</h2><span>Tap a group to play again</span></div>
+        <div className="group-list">{groups.map(g => <div className={`group-card ${groupId === g.id ? 'selected' : ''}`} key={g.id}>
+          <button type="button" className="group-main" aria-pressed={groupId === g.id} onClick={() => loadGroup(g)}>
+            <b>{g.name}</b>
+            <small>{g.players.length} players · {g.gamesPlayed} game{g.gamesPlayed === 1 ? '' : 's'} played</small>
+            <small className="group-names">{g.players.join(', ')}</small>
+          </button>
+          <div className="group-actions">
+            {g.activeGame && <button type="button" className="group-resume" onClick={() => resumeGame(g)}>Resume game · {g.activeGame.turnsPlayed}/{g.activeGame.players} turns</button>}
+            <button type="button" className="group-delete" onClick={() => deleteGroup(g)} aria-label={`Delete group ${g.name}`}>Delete</button>
+          </div>
+        </div>)}</div>
+      </>}
+      <div className="section-heading"><h2>{groupId ? 'Group name' : 'Name your group'}</h2>{groupId ? <button className="text-button" onClick={newGroup}>＋ Start a new group instead</button> : <span>Saved so you can play again</span>}</div>
+      <div className="player-input group-name"><input aria-label="Group name" value={groupName} maxLength="40" onChange={e => setGroupName(e.target.value)} placeholder="e.g. Friday game night"/></div>
       <div className="section-heading"><h2>Who's playing?</h2><span>{players.length}/{MAX_PLAYERS} players</span></div>
       <div className="player-list">{players.map((p, i) => <div className="player-input" key={i}><span className="player-number">{i + 1}</span><input aria-label={`Player ${i + 1} name`} value={p} maxLength="24" onChange={e => updatePlayer(i, e.target.value)} placeholder={`Player ${i + 1}`}/>{players.length > 2 && <button className="remove" onClick={() => removePlayer(i)} aria-label="Remove player">×</button>}</div>)}</div>
       <button className="add-player" onClick={addPlayer} disabled={players.length >= MAX_PLAYERS}>＋ Add another player</button>
@@ -291,14 +433,15 @@ function App() {
 
       <div className="section-heading"><h2>{activePlayer ? `${activePlayer}, set up your turn` : 'Set up your turn'}</h2></div>
       <div className="two-col">
-        <div><div className="section-heading tight"><h2>Category</h2></div><select aria-label="Category" value={category} onChange={e => setCategory(e.target.value)}><option value="all">All categories</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.count})</option>)}</select></div>
+        <div><div className="section-heading tight"><h2>Category</h2></div><select aria-label="Category" value={category} onChange={e => setCategory(e.target.value)}><option value="all">All categories</option>{modeCategories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.count})</option>)}</select></div>
         <div><div className="section-heading tight"><h2>Difficulty</h2></div><DifficultyPicker value={difficulty} onChange={setDifficulty} /></div>
       </div>
       <div className="section-heading"><h2>How will you give clues?</h2></div>
-      <div className="mode-grid">{MODES.map(m => <button key={m.id} type="button" onClick={() => setMode(m.id)} className={`mode-card ${mode === m.id ? 'selected' : ''}`}><span>{m.icon}</span><b>{m.name}</b><small>{m.detail}</small></button>)}</div>
+      <div className="mode-grid">{MODES.map(m => <button key={m.id} type="button" onClick={() => chooseMode(m.id)} className={`mode-card ${mode === m.id ? 'selected' : ''}`}><span>{m.icon}</span><b>{m.name}</b><small>{m.detail}</small></button>)}</div>
       {message && <p className="error">{message}</p>}
       <button className="primary start" onClick={startTurn} disabled={activeIndex === null}>{activePlayer ? `Start ${activePlayer}'s turn` : 'Tap your name to start'} <span>→</span></button>
       <p className="fine-print">During your turn you can change the difficulty for each next word, or switch category without stopping the clock.</p>
+      {saveError && <p className="error">{saveError}</p>}
       <button className="text-button centered" onClick={quitGame}>Quit game</button>
     </section>}
 
@@ -311,7 +454,7 @@ function App() {
         <div className="picker-head"><button className="back-link" onClick={() => setPickingCategory(false)}>← Back to my word</button><span className="timer-note">⏱ Timer keeps running</span></div>
         <h2>Change category</h2>
         <p>Your next word will come from the category you pick. Your current word stays hidden while you choose.</p>
-        <div className="chip-grid">{[{ id: 'all', name: 'All categories' }, ...categories].map(c => <button key={c.id} type="button" aria-pressed={category === c.id} className={`chip ${category === c.id ? 'selected' : ''}`} onClick={() => setCategory(c.id)}>{c.name}{c.count ? <small>{c.count}</small> : null}</button>)}</div>
+        <div className="chip-grid">{[{ id: 'all', name: 'All categories' }, ...modeCategories].map(c => <button key={c.id} type="button" aria-pressed={category === c.id} className={`chip ${category === c.id ? 'selected' : ''}`} onClick={() => setCategory(c.id)}>{c.name}{c.count ? <small>{c.count}</small> : null}</button>)}</div>
         <div className="game-actions">
           <button className="secondary" onClick={() => setPickingCategory(false)}>Keep my word <span>↩</span></button>
           <button className="primary" onClick={drawFromPicker} disabled={busy}>New word now <span>{categoryLabel}</span></button>
@@ -364,6 +507,8 @@ function App() {
         {reviewFor === r.i && <div className="leader-review"><ReviewCard name={r.name} log={logs[r.i] || []} onSet={(k, res) => setResult(r.i, k, res)} onClose={() => setReviewFor(null)} /></div>}
       </div>)}</div>
       <p className="review-note">Tap Review next to a player to check the words they guessed or skipped and fix any mistakes. The winner updates as you go.</p>
+      <AllTimeBoard board={board} groupName={groupName} />
+      {saveError && <p className="error">{saveError}</p>}
       <div className="result-actions">
         <button className="primary" onClick={playAgain}>Play again with the same players <span>↻</span></button>
         <button className="secondary" onClick={copyResults}>{copied ? '✓ Copied to clipboard' : 'Copy results'}</button>
